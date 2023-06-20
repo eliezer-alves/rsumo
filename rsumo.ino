@@ -8,8 +8,8 @@ int procurarInimigo = 1;
 int procurou = 0;
 int direcao = 0;
 
-int SUAVIZAR_MUDANCA_MOVIMEMTO = 0;
-int DELAY_SUAVIZACAO = 200;
+int SUAVIZAR_MUDANCA_MOVIMEMTO = 1;
+int DELAY_SUAVIZACAO = 100;
 
 
 //Sensor Linha
@@ -146,9 +146,60 @@ void moverPassoRe(int tempo) {
   }
 }
 
-void mover() {
+void mover(int _delay=0) {
   analogWrite(velocidadeEsq,velocidade);
   analogWrite(velocidadeDir,velocidade);
+  delay(_delay);
+}
+
+void moverFrente(int _delay=0) {
+  frenteEsq();
+  frenteDir();
+  mover(_delay);
+}
+
+
+
+void corrigeTragetoriaDigital() {
+  int ld = digitalRead(linhaDireita);
+  int le = digitalRead(linhaEsquerda);
+  
+  if (ld && le) {
+    return;
+  }
+
+  if (!ld) {
+    girarEsq(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaDigital();
+  } else if (!le) {
+    girarDir(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaDigital();
+  }  
+}
+
+void corrigeTragetoriaAnalogico(int teveErro=0) {
+  int ld = analogRead(linhaDireitaAnlg);
+  int le = analogRead(linhaEsquerdaAnlg);
+
+  if (ld < SENSIBILIDADE_LINHA) { // geralmente 20 a 30 branco 100 a 900 preto;
+    explorar = 0;
+    girarEsq(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaAnalogico(1);
+  } else if (le < SENSIBILIDADE_LINHA) { // geralmente 20 a 30 branco 100 a 900 preto;
+    explorar = 0;
+    girarDir(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaAnalogico(1);
+  } else if (teveErro) {
+    mover(2000);
+  }
+}
+
+void corrigeTragetoria() {
+  if (TIPO_SENSOR_LINHA) {
+    corrigeTragetoriaAnalogico();
+  } else {
+    corrigeTragetoriaDigital();
+  }
 }
 
 double getDistancia() {
@@ -182,46 +233,6 @@ double getDistancia2() {
   //Serial.println(distancia);
 
   return distancia;
-}
-
-void corrigeTragetoria() {
-  if (TIPO_SENSOR_LINHA) {
-    corrigeTragetoriaAnalogico();
-  } else {
-    corrigeTragetoriaDigital();
-  }
-}
-
-void corrigeTragetoriaDigital() {
-  int ld = digitalRead(linhaDireita);
-  int le = digitalRead(linhaEsquerda);
-  
-  if (ld && le) {
-    return;
-  }
-
-  if (!ld) {
-    girarEsq(CORRECAO_TRAJETORIA);
-    return corrigeTragetoriaDigital();
-  } else if (!le) {
-    girarDir(CORRECAO_TRAJETORIA);
-    return corrigeTragetoriaDigital();
-  }  
-}
-
-void corrigeTragetoriaAnalogico() {
-  int ld = analogRead(linhaDireitaAnlg);
-  int le = analogRead(linhaEsquerdaAnlg);
-
-  if (ld < SENSIBILIDADE_LINHA) { // geralmente 20 a 30 branco 100 a 900 preto;
-    explorar = 0;
-    girarEsq(CORRECAO_TRAJETORIA);
-    return corrigeTragetoriaAnalogico();
-  } else if (le < SENSIBILIDADE_LINHA) { // geralmente 20 a 30 branco 100 a 900 preto;
-    explorar = 0;
-    girarDir(CORRECAO_TRAJETORIA);
-    return corrigeTragetoriaAnalogico();
-  }  
 }
 
 void mudarDirecao() {
@@ -262,11 +273,11 @@ void loop(){
 
   double distancia = getDistancia();
   double distancia2 = getDistancia2();
-  Serial.println(distancia);
-  Serial.println(distancia2);
-  Serial.println("----------");
+  // Serial.println(distancia);
+  // Serial.println(distancia2);
+  // Serial.println("----------");
   // // corrigeTragetoriaLinha();
-  // corrigeTragetoria();
+  corrigeTragetoria();
 
   // //Serial.println(distancia);
 
@@ -274,12 +285,10 @@ void loop(){
     mudarDirecao();
     procurou = 0;
     velocidade = 255;
-    frenteDir();
-    frenteEsq();
-    mover();
+    moverFrente();
   } else {    
     procuraInimigo();
   }
-  delay(400);
+  // delay(400);
   
 }
