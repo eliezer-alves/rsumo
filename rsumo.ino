@@ -1,15 +1,37 @@
 /*Pinagem do arduino*/
 
+int iniciar = 1;
+int DELAY_INICIO = 3000;
+
+int explorar = 0;
+int procurarInimigo = 1;
+int procurou = 0;
+int direcao = 0;
+
+int SUAVIZAR_MUDANCA_MOVIMEMTO = 0;
+int DELAY_SUAVIZACAO = 200;
+
+
 //Sensor Linha
+int TIPO_SENSOR_LINHA = 1; // 1 = analógico, 2 = digital
+int SENSIBILIDADE_LINHA = 40; // valor abixo desse é consididerado limite do ringue -> geralmente 20 a 30 branco 100 a 900 preto;
+int CORRECAO_TRAJETORIA = 700;
+int mudar_correcao = 0;
+
+
+int linhaDireitaAnlg = A0;
+int linhaEsquerdaAnlg = A1;
 int linhaDireita = 9; //Sensor linha direita  
 int linhaEsquerda = 10; //Sensor linha esquerda
+
+
 
 //Sensor Distancia
 const int trigPin = 11; //Trigger pino 5
 const int echoPin = 12; //Echo pino 4
 const int delayLeitura = 50;
-float distancia;
-float duracao;
+double distanciaMaximaInimigo = 70;
+double duracao;
 
 //motor_Esquerda
 int IN1 = 2 ;
@@ -23,12 +45,15 @@ int velocidadeDir = 5;
 
 //variavel auxiliar
 int minVel = 180;
-int velocidade = minVel;
+int velocidade = 255;
 int velocidadeGiro = 255;
+
 
 //Inicializa Pinos
 void setup(){
   //Sensor Linha
+  pinMode(linhaEsquerdaAnlg, INPUT);
+  pinMode(linhaDireitaAnlg, INPUT);
   pinMode(linhaDireita, INPUT);
   pinMode(linhaEsquerda, INPUT);
 
@@ -70,27 +95,33 @@ void reDir() {
   digitalWrite(IN4,HIGH);
 }
 
-void girarEsq() {
-  moverPassoRe(200);
+void girarEsq(int tempo = 500, int recuo = 1) {
+  if (recuo) {  
+    moverPassoRe(200);
+  }
   reEsq();
   frenteDir();
-  moverPasso(500);
+  moverPasso(tempo);
 }
 
-void girarDir() {
-  moverPassoRe(200);
+void girarDir(int tempo = 500, int recuo = 1) {
+  if (recuo) {
+    moverPassoRe(200);
+  }
   reDir();
   frenteEsq();
-  moverPasso(500);
+  moverPasso(tempo);
 }
 
 void moverPasso(int tempo) {
   analogWrite(velocidadeEsq,velocidadeGiro);
   analogWrite(velocidadeDir,velocidadeGiro);
   delay(tempo);
-  analogWrite(velocidadeEsq,0);
-  analogWrite(velocidadeDir,0);
-  delay(tempo);
+  if (SUAVIZAR_MUDANCA_MOVIMEMTO) {
+    analogWrite(velocidadeEsq,0);
+    analogWrite(velocidadeDir,0);
+    delay(DELAY_SUAVIZACAO);
+  }
 }
 
 void moverPassoRe(int tempo) {
@@ -99,9 +130,11 @@ void moverPassoRe(int tempo) {
   analogWrite(velocidadeEsq,velocidadeGiro);
   analogWrite(velocidadeDir,velocidadeGiro);
   delay(tempo);
-  analogWrite(velocidadeEsq,0);
-  analogWrite(velocidadeDir,0);
-  delay(tempo);
+  if (SUAVIZAR_MUDANCA_MOVIMEMTO) {
+    analogWrite(velocidadeEsq,0);
+    analogWrite(velocidadeDir,0);
+    delay(DELAY_SUAVIZACAO);
+  }
 }
 
 void mover() {
@@ -121,12 +154,20 @@ double getDistancia() {
   //quando o pino voltar para LOW, retornando o
   //tempo em microsegundos.
   double distancia = duracao * 0.034 / 2;
-  Serial.println(distancia);
+  //Serial.println(distancia);
 
   return distancia;
 }
 
-void corrigeTragetoriaLinha() {
+void corrigeTragetoria() {
+  if (TIPO_SENSOR_LINHA) {
+    corrigeTragetoriaAnalogico();
+  } else {
+    corrigeTragetoriaDigital();
+  }
+}
+
+void corrigeTragetoriaDigital() {
   int ld = digitalRead(linhaDireita);
   int le = digitalRead(linhaEsquerda);
   
@@ -135,42 +176,81 @@ void corrigeTragetoriaLinha() {
   }
 
   if (!ld) {
-    girarEsq();
-    return corrigeTragetoriaLinha();
+    girarEsq(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaDigital();
   } else if (!le) {
-    girarDir();
-    return corrigeTragetoriaLinha();
-  }
-  
-  // Serial.println(ld);
-  // Serial.println(le);
+    girarDir(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaDigital();
+  }  
 }
 
+void corrigeTragetoriaAnalogico() {
+  int ld = analogRead(linhaDireitaAnlg);
+  int le = analogRead(linhaEsquerdaAnlg);
+
+  if (ld < SENSIBILIDADE_LINHA) { // geralmente 20 a 30 branco 100 a 900 preto;
+    explorar = 0;
+    girarEsq(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaAnalogico();
+  } else if (le < SENSIBILIDADE_LINHA) { // geralmente 20 a 30 branco 100 a 900 preto;
+    explorar = 0;
+    girarDir(CORRECAO_TRAJETORIA);
+    return corrigeTragetoriaAnalogico();
+  }  
+}
+
+void mudarDirecao() {
+  if (direcao) {
+    direcao = 0;
+  } else {
+    direcao = 1;
+  }
+}
+
+void _iniciar() {
+  frenteDir();
+  frenteEsq();
+  delay(DELAY_INICIO);
+  mover();
+}
+
+void procuraInimigo() {
+    if(direcao) {
+      girarDir(100, 0);      
+    } else {
+      girarEsq(100, 0);
+    }
+    if (procurou > 5) {
+      procurou = 0;
+      explorar = 1;
+    }
+    procurou+=1;
+    delay(100);
+}
 
 void loop(){
-  double d = getDistancia();
-  int acabouDeVirar = 0;
 
-  corrigeTragetoriaLinha();
-
-  if (d <= 20) {
-    girarDir();
-    acabouDeVirar = 1;
+  if (iniciar) {
+    iniciar = 0;
+    _iniciar();
   }
-  else if (d <= 40) {
-    velocidade = minVel;
-  } else if (d <= 60) {
-    velocidade = 200;
-  } else {
+
+  double distancia = getDistancia();
+  // // corrigeTragetoriaLinha();
+  corrigeTragetoria();
+
+  // //Serial.println(distancia);
+
+  if (distancia < distanciaMaximaInimigo || explorar) {
+    mudarDirecao();
+    procurou = 0;
     velocidade = 255;
-  }
-  if (acabouDeVirar) {
-    acabouDeVirar = 0;
-  } else {
     frenteDir();
     frenteEsq();
     mover();
+  } else {    
+    procuraInimigo();
   }
-  delay(10);
+  // delay(10);
   
 }
