@@ -21,17 +21,22 @@ int mudar_correcao = 0;
 
 int linhaDireitaAnlg = A0;
 int linhaEsquerdaAnlg = A1;
-int linhaDireita = 9; //Sensor linha direita  
-int linhaEsquerda = 10; //Sensor linha esquerda
+int linhaDireita = 8; //Sensor linha direita  
+int linhaEsquerda = 9; //Sensor linha esquerda
 
 
 
+double distanciaMaximaInimigo = 70;
 //Sensor Distancia
 const int trigPin = 11; //Trigger pino 5
 const int echoPin = 12; //Echo pino 4
 const int delayLeitura = 50;
-double distanciaMaximaInimigo = 70;
 double duracao;
+
+//Sensor Distancia2
+const int trigPin2 = 10; //Trigger pino 5
+const int echoPin2 = 13; //Echo pino 4
+double duracao2;
 
 //motor_Esquerda
 int IN1 = 2 ;
@@ -60,6 +65,10 @@ void setup(){
   //Sensor Distancia
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);  
+
+  //Sensor Distancia2
+  pinMode(trigPin2, OUTPUT);
+  pinMode(echoPin2, INPUT);  
 
   //motor_Esquerda
   pinMode(IN1,OUTPUT);
@@ -158,6 +167,22 @@ double getDistancia() {
 
   return distancia;
 }
+double getDistancia2() {
+  digitalWrite(trigPin2, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin2, LOW);
+  duracao2 = pulseIn(echoPin2, HIGH);
+  //A função pulseIn espera o pino ir para HIGH,
+  //inicia um temporizador, e para o temporizador
+  //quando o pino voltar para LOW, retornando o
+  //tempo em microsegundos.
+  double distancia = duracao2 * 0.034 / 2;
+  //Serial.println(distancia);
+
+  return distancia;
+}
 
 void corrigeTragetoria() {
   if (TIPO_SENSOR_LINHA) {
@@ -236,12 +261,16 @@ void loop(){
   }
 
   double distancia = getDistancia();
+  double distancia2 = getDistancia2();
+  Serial.println(distancia);
+  Serial.println(distancia2);
+  Serial.println("----------");
   // // corrigeTragetoriaLinha();
-  corrigeTragetoria();
+  // corrigeTragetoria();
 
   // //Serial.println(distancia);
 
-  if (distancia < distanciaMaximaInimigo || explorar) {
+  if (distancia < distanciaMaximaInimigo || distancia2 < distanciaMaximaInimigo || explorar) {
     mudarDirecao();
     procurou = 0;
     velocidade = 255;
@@ -251,6 +280,6 @@ void loop(){
   } else {    
     procuraInimigo();
   }
-  // delay(10);
+  delay(400);
   
 }
